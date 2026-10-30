@@ -7,6 +7,7 @@ import { UsePageProps } from '../../types/system'
 import { IconMenu2, IconX } from '@tabler/icons-react'
 import ThemeToggle from '~/components/ThemeToggle'
 import DebugInfoModal from './DebugInfoModal'
+import { getAppPathname } from '../lib/ingress'
 
 type SidebarItem = {
   name: string
@@ -28,7 +29,7 @@ const StyledSidebar: React.FC<StyledSidebarProps> = ({ title, items }) => {
 
   const currentPath = useMemo(() => {
     if (typeof window === 'undefined') return ''
-    return window.location.pathname
+    return getAppPathname()
   }, [])
 
   const ListItem = (item: SidebarItem) => {

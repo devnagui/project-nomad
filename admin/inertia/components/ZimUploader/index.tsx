@@ -1,6 +1,7 @@
 import Uppy from '@uppy/core'
 import Dashboard from '@uppy/react/dashboard'
 import XHRUpload from '@uppy/xhr-upload'
+import { withIngressPath } from '../../lib/ingress'
 import '@uppy/core/css/style.min.css'
 import '@uppy/dashboard/css/style.min.css'
 import { useEffect, useRef, useState } from 'react'
@@ -34,7 +35,7 @@ export default function ZimUploader({ onUploadComplete, existingFilenames }: Zim
       },
       autoProceed: false,
     }).use(XHRUpload, {
-      endpoint: '/api/zim/upload',
+      endpoint: withIngressPath('/api/zim/upload'),
       fieldName: 'file',
       getResponseError: (responseText) => {
         try {

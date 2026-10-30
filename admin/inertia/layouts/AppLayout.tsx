@@ -7,6 +7,7 @@ import { SERVICE_NAMES } from '../../constants/service_names'
 import { Link, router } from '@inertiajs/react'
 import { IconArrowLeft } from '@tabler/icons-react'
 import classNames from 'classnames'
+import { getAppPathname } from '../lib/ingress'
 
 export default function AppLayout({
   children,
@@ -26,7 +27,7 @@ export default function AppLayout({
   return (
     <div className="min-h-screen flex flex-col">
       {
-        window.location.pathname !== '/home' && (
+        getAppPathname() !== '/home' && (
           <Link
             href="/home"
             className={classNames(
@@ -62,7 +63,7 @@ export default function AppLayout({
       <hr className={
         classNames(
           "text-desert-green font-semibold h-[1.5px] bg-desert-green border-none",
-          !compact && window.location.pathname !== '/home' ? "mt-12 md:mt-0" : "mt-0"
+          !compact && getAppPathname() !== '/home' ? "mt-12 md:mt-0" : "mt-0"
         )} />
       <div className="flex-1 w-full bg-desert">{children}</div>
       <Footer />

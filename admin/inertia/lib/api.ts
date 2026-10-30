@@ -18,6 +18,7 @@ import { BenchmarkType, RunBenchmarkResponse, SubmitBenchmarkResponse, UpdateBui
 import type { CreateMapMarkerPayload, MapMarkerResponse, UpdateMapMarkerPayload } from '../../types/maps'
 import type { ChatSource } from '../../types/chat'
 import { chatStreamErrorMessage } from './chat_stream.js'
+import { withIngressPath } from './ingress.js'
 
 type OllamaChatRequestWithImages = OllamaChatRequest & { images?: File[] }
 
@@ -44,7 +45,7 @@ class API {
 
   constructor() {
     this.client = axios.create({
-      baseURL: '/api',
+      baseURL: withIngressPath('/api'),
       headers: {
         'Content-Type': 'application/json',
       },

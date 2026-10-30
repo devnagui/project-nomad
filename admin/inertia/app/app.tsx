@@ -13,9 +13,11 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import NotificationsProvider from '~/providers/NotificationProvider'
 import { ThemeProvider } from '~/providers/ThemeProvider'
 import { UsePageProps } from '../../types/system'
+import { getIngressPath, installIngressRuntime } from '../lib/ingress'
 
 const appName = import.meta.env.VITE_APP_NAME || 'Project NOMAD'
 const queryClient = new QueryClient()
+installIngressRuntime()
 
 // Patch the global crypto object for non-HTTPS/localhost contexts
 if (!window.crypto?.randomUUID) {
@@ -40,7 +42,10 @@ createInertiaApp({
     createRoot(el).render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <TransmitProvider baseUrl={window.location.origin} enableLogging={environment === 'development'}>
+          <TransmitProvider
+            baseUrl={`${window.location.origin}${getIngressPath()}`}
+            enableLogging={environment === 'development'}
+          >
             <NotificationsProvider>
               <ModalsProvider>
                 <App {...props} />
