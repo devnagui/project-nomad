@@ -27,6 +27,7 @@ import KVStore from '#models/kv_store'
 import { BROADCAST_CHANNELS } from '../../constants/broadcast.js'
 import { KIWIX_LIBRARY_CMD } from '../../constants/kiwix.js'
 import { DEFAULT_OLLAMA_CONTEXT_LENGTH } from '../../constants/ollama.js'
+import { getExternalService, getExternalServices } from '../utils/external_services.js'
 
 // Written by install_nomad.sh with the host AMD GPU's gfx target.
 const AMD_GFX_MARKER_PATH = '/app/storage/.nomad-amd-gfx'
@@ -90,6 +91,14 @@ export class DockerService {
     serviceName: string,
     action: 'start' | 'stop' | 'restart'
   ): Promise<{ success: boolean; message: string }> {
+    const externalService = getExternalService(serviceName)
+    if (externalService) {
+      return {
+        success: false,
+        message: `${serviceName} is managed externally by Home Assistant`,
+      }
+    }
+
     try {
       const service = await Service.query().where('service_name', serviceName).first()
       if (!service || !service.installed) {
@@ -201,6 +210,14 @@ export class DockerService {
   }
 
   private async _fetchServicesStatus(): Promise<{ service_name: string; status: string }[]> {
+    const externalServices = getExternalServices()
+    if (externalServices.length > 0) {
+      return externalServices.map((service) => ({
+        service_name: service.serviceName,
+        status: 'running',
+      }))
+    }
+
     try {
       const containers = await this.docker.listContainers({ all: true })
       const containerMap = new Map<string, Docker.ContainerInfo>()
@@ -236,6 +253,9 @@ export class DockerService {
       const remoteUrl = await KVStore.getValue('ai.remoteOllamaUrl')
       if (remoteUrl) return remoteUrl
     }
+
+    const externalService = getExternalService(serviceName)
+    if (externalService) return externalService.internalUrl
 
     const service = await Service.query()
       .where('service_name', serviceName)
@@ -1358,6 +1378,8 @@ export class DockerService {
    * that need to be migrated to library mode.
    */
   async isKiwixOnLegacyConfig(): Promise<boolean> {
+    if (getExternalService(SERVICE_NAMES.KIWIX)) return false
+
     try {
       const containers = await this.docker.listContainers({ all: true })
       const info = containers.find((c) => c.Names.includes(`/${SERVICE_NAMES.KIWIX}`))
