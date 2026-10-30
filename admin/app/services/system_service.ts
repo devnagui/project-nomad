@@ -33,6 +33,7 @@ import {
 import { invalidateAssistantNameCache } from '../../config/inertia.js'
 import { invalidateMinRelevanceCache } from '../utils/rag_relevance.js'
 import { invalidateResponseStyleCache } from '../utils/response_style.js'
+import { getExternalService } from '../utils/external_services.js'
 import { KiwixLibraryService } from '#services/kiwix_library_service'
 
 @inject()
@@ -330,6 +331,7 @@ export class SystemService {
 
     for (const service of services) {
       const status = statuses.find((s) => s.service_name === service.service_name)
+      const externalService = getExternalService(service.service_name)
       toReturn.push({
         id: service.id,
         service_name: service.service_name,
@@ -340,7 +342,7 @@ export class SystemService {
         installation_status: service.installation_status,
         status: status ? status.status : 'unknown',
         ui_location: service.ui_location || '',
-        custom_url: service.custom_url,
+        custom_url: externalService?.publicUrl ?? service.custom_url,
         powered_by: service.powered_by,
         display_order: service.display_order,
         container_image: service.container_image,
@@ -349,7 +351,7 @@ export class SystemService {
         is_custom: service.is_custom,
         is_user_modified: service.is_user_modified,
         is_deprecated: service.is_deprecated,
-        is_link_tile: service.is_link_tile,
+        is_link_tile: externalService ? true : service.is_link_tile,
         link_color: service.link_color,
         category: service.category,
       })

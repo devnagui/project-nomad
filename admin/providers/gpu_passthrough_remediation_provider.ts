@@ -1,5 +1,6 @@
 import logger from '@adonisjs/core/services/logger'
 import type { ApplicationService } from '@adonisjs/core/types'
+import { getExternalServices } from '../app/utils/external_services.js'
 
 /**
  * Detects Ollama's silent CPU fallback after admin / host restart, and auto-remediates
@@ -39,6 +40,7 @@ export default class GpuPassthroughRemediationProvider {
 
   async boot() {
     if (this.app.getEnvironment() !== 'web') return
+    if (getExternalServices().length > 0) return
 
     setImmediate(async () => {
       try {

@@ -27,6 +27,9 @@ export default await Env.create(new URL('../', import.meta.url), {
   |----------------------------------------------------------
   */
   NOMAD_STORAGE_PATH: Env.schema.string.optional(),
+  NOMAD_PLATFORM: Env.schema.enum.optional(['docker', 'haos'] as const),
+  NOMAD_KIWIX_URL: Env.schema.string.optional(),
+  NOMAD_KIWIX_PUBLIC_URL: Env.schema.string.optional(),
 
   /*
   |----------------------------------------------------------
