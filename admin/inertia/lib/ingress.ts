@@ -2,7 +2,7 @@ import { router } from '@inertiajs/react'
 import {
   getAppPathname as getAppPathnameForPath,
   getIngressPath as getIngressPathForPath,
-  withIngressPath as withIngressPathForBase,
+  withIngressOrigin,
 } from './ingress_path'
 
 export function getIngressPath(pathname = window.location.pathname): string {
@@ -14,12 +14,14 @@ export function getAppPathname(pathname = window.location.pathname): string {
 }
 
 export function withIngressPath(url: string, ingressPath = getIngressPath()): string {
-  return withIngressPathForBase(url, ingressPath)
+  return withIngressOrigin(url, ingressPath, window.location.origin)
 }
 
 function rewriteUrlAttribute(element: Element, attribute: 'action' | 'href' | 'src') {
   const value = element.getAttribute(attribute)
-  if (value) element.setAttribute(attribute, withIngressPath(value))
+  if (!value) return
+  const rewritten = withIngressPath(value)
+  if (rewritten !== value) element.setAttribute(attribute, rewritten)
 }
 
 export function installIngressRuntime() {
@@ -30,15 +32,10 @@ export function installIngressRuntime() {
   window.fetch = (input, init) => {
     if (typeof input === 'string') return nativeFetch(withIngressPath(input, ingressPath), init)
     if (input instanceof URL) {
-      const url = new URL(input)
-      if (url.origin === window.location.origin)
-        url.pathname = withIngressPath(url.pathname, ingressPath)
-      return nativeFetch(url, init)
+      return nativeFetch(new URL(withIngressPath(input.toString(), ingressPath)), init)
     }
     if (input.url.startsWith(window.location.origin)) {
-      const url = new URL(input.url)
-      url.pathname = withIngressPath(url.pathname, ingressPath)
-      return nativeFetch(new Request(url, input), init)
+      return nativeFetch(new Request(withIngressPath(input.url, ingressPath), input), init)
     }
     return nativeFetch(input, init)
   }
@@ -62,9 +59,9 @@ export function installIngressRuntime() {
     for (const attribute of ['action', 'href', 'src'] as const) {
       if (root instanceof Element && root.hasAttribute(attribute))
         rewriteUrlAttribute(root, attribute)
-      root
-        .querySelectorAll(`[${attribute}^="/"]:not([${attribute}^="//"])`)
-        .forEach((element) => rewriteUrlAttribute(element, attribute))
+      root.querySelectorAll(`[${attribute}]`).forEach((element) =>
+        rewriteUrlAttribute(element, attribute)
+      )
     }
   }
 

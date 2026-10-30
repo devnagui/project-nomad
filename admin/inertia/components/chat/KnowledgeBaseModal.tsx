@@ -26,6 +26,7 @@ import {
   IconSortDescending,
   IconX,
 } from '@tabler/icons-react'
+import { withIngressPath } from '../../lib/ingress'
 import { useModals } from '~/context/ModalContext'
 import StyledModal from '../StyledModal'
 import ActiveEmbedJobs from '~/components/ActiveEmbedJobs'
@@ -1080,7 +1081,9 @@ export default function KnowledgeBaseModal({
                             size="sm"
                             icon="IconDownload"
                             onClick={() => {
-                              window.location.href = `/api/rag/files/download?source=${encodeURIComponent(record.source)}`
+                              window.location.href = withIngressPath(
+                                `/api/rag/files/download?source=${encodeURIComponent(record.source)}`
+                              )
                             }}
                           >
                             Download

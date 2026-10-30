@@ -15,3 +15,17 @@ export function withIngressPath(url: string, ingressPath: string): string {
   }
   return `${ingressPath}${url}`
 }
+
+export function withIngressOrigin(url: string, ingressPath: string, origin: string): string {
+  const pathUrl = withIngressPath(url, ingressPath)
+  if (pathUrl !== url || !ingressPath) return pathUrl
+
+  try {
+    const parsed = new URL(url)
+    if (parsed.origin !== origin) return url
+    parsed.pathname = withIngressPath(parsed.pathname, ingressPath)
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}

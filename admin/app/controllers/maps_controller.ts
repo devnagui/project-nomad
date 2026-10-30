@@ -12,6 +12,7 @@ import {
 import { inject } from '@adonisjs/core'
 import type { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
+import { parseIngressPath } from '../utils/ingress.js'
 
 @inject()
 export default class MapsController {
@@ -143,13 +144,16 @@ export default class MapsController {
       })
     }
 
-    const forwardedProto = request.headers()['x-forwarded-proto'];
+    const forwardedProto = request.headers()['x-forwarded-proto']
 
     const protocol: string = forwardedProto
-      ? (typeof forwardedProto === 'string' ? forwardedProto : request.protocol())
-      : request.protocol();
+      ? typeof forwardedProto === 'string'
+        ? forwardedProto
+        : request.protocol()
+      : request.protocol()
 
-    const styles = await this.mapService.generateStylesJSON(request.host(), protocol)
+    const ingressPath = parseIngressPath(request.header('x-ingress-path')) ?? ''
+    const styles = await this.mapService.generateStylesJSON(request.host(), protocol, ingressPath)
     return response.json(styles)
   }
 

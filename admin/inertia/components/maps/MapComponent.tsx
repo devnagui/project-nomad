@@ -7,6 +7,7 @@ import Map, {
 } from 'react-map-gl/maplibre'
 import type { MapLayerMouseEvent, MapRef } from 'react-map-gl/maplibre'
 import maplibregl from 'maplibre-gl'
+import { withIngressPath } from '../../lib/ingress'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 import { Protocol } from 'pmtiles'
@@ -366,7 +367,7 @@ export default function MapComponent({
           reuseMaps
           style={{ width: '100%', height: '100vh' }}
           cursor={isDraggingMap ? 'grabbing' : 'crosshair'}
-          mapStyle={`${window.location.protocol}//${window.location.hostname}:${window.location.port}/api/maps/styles`}
+          mapStyle={withIngressPath('/api/maps/styles')}
           mapLib={maplibregl}
           initialViewState={initialViewState}
           onMoveEnd={(e) => {

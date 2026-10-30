@@ -15,6 +15,7 @@ import {
 } from '../utils/fs.js'
 import { join, resolve, sep } from 'path'
 import urlJoin from 'url-join'
+import { prefixIngressUrl } from '../utils/ingress.js'
 import { RunDownloadJob } from '#jobs/run_download_job'
 import { RunExtractPmtilesJob } from '#jobs/run_extract_pmtiles_job'
 import logger from '@adonisjs/core/services/logger'
@@ -344,7 +345,11 @@ export class MapService implements IMapService {
     }
   }
 
-  async generateStylesJSON(host: string | null = null, protocol: string = 'http'): Promise<BaseStylesFile> {
+  async generateStylesJSON(
+    host: string | null = null,
+    protocol: string = 'http',
+    ingressPath: string = ''
+  ): Promise<BaseStylesFile> {
     if (!(await this.checkBaseAssetsExist())) {
       throw new Error('Base map assets are missing from storage/maps')
     }
@@ -360,13 +365,13 @@ export class MapService implements IMapService {
     const regions = (await this.listRegions()).files
 
     /** If we have the host, use it to build public URLs, otherwise we'll fallback to defaults
-    * This is mainly useful because we need to know what host the user is accessing from in order to
-    * properly generate URLs in the styles file
-    * e.g. user is accessing from "example.com", but we would by default generate "localhost:8080/..." so maps would
-    * fail to load.
-    */
-    const sources = this.generateSourcesArray(host, regions, protocol)
-    const baseUrl = this.getPublicFileBaseUrl(host, this.basemapsAssetsDir, protocol)
+     * This is mainly useful because we need to know what host the user is accessing from in order to
+     * properly generate URLs in the styles file
+     * e.g. user is accessing from "example.com", but we would by default generate "localhost:8080/..." so maps would
+     * fail to load.
+     */
+    const sources = this.generateSourcesArray(host, regions, protocol, ingressPath)
+    const baseUrl = this.getPublicFileBaseUrl(host, this.basemapsAssetsDir, protocol, ingressPath)
 
     const styles = await this.generateStylesFile(
       rawStyles,
@@ -535,9 +540,14 @@ export class MapService implements IMapService {
     return a < b ? -1 : 1
   }
 
-  private generateSourcesArray(host: string | null, regions: FileEntry[], protocol: string = 'http'): BaseStylesFile['sources'][] {
+  private generateSourcesArray(
+    host: string | null,
+    regions: FileEntry[],
+    protocol: string = 'http',
+    ingressPath: string = ''
+  ): BaseStylesFile['sources'][] {
     const sources: BaseStylesFile['sources'][] = []
-    const baseUrl = this.getPublicFileBaseUrl(host, 'pmtiles', protocol)
+    const baseUrl = this.getPublicFileBaseUrl(host, 'pmtiles', protocol, ingressPath)
 
     // World basemap goes first so its layers render underneath regional extracts.
     // Only emitted when ensureWorldBasemap() succeeded — otherwise the style would
@@ -937,7 +947,12 @@ export class MapService implements IMapService {
    * @param protocol - the protocol to use in the generated URL (e.g. "http", "https"), defaults to "http"
    * @returns the public URL for the map asset
    */
-  private getPublicFileBaseUrl(specifiedHost: string | null, childPath: string, protocol: string = 'http'): string {
+  private getPublicFileBaseUrl(
+    specifiedHost: string | null,
+    childPath: string,
+    protocol: string = 'http',
+    ingressPath: string = ''
+  ): string {
     function getHost() {
       try {
         const localUrlRaw = env.get('URL')
@@ -967,10 +982,11 @@ export class MapService implements IMapService {
       return getHost()
     }
 
-    const host = specifiedHostOrDefault();
+    const host = specifiedHostOrDefault()
     const withProtocol = `${protocol}://${host}`
-    const baseUrlPath =
+    const unprefixedPath =
       process.env.NODE_ENV === 'production' ? childPath : urlJoin(this.mapStoragePath, childPath)
+    const baseUrlPath = prefixIngressUrl(`/${unprefixedPath.replace(/^\/+/, '')}`, ingressPath)
 
     const baseUrl = new URL(baseUrlPath, withProtocol).toString()
     return baseUrl
