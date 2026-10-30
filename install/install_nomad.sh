@@ -30,13 +30,20 @@ GREEN='\033[1;32m' # Light Green.
 
 WHIPTAIL_TITLE="Project NOMAD Installation"
 NOMAD_DIR="/opt/project-nomad"
-MANAGEMENT_COMPOSE_FILE_URL="https://raw.githubusercontent.com/Crosstalk-Solutions/project-nomad/refs/heads/main/install/management_compose.yaml"
-START_SCRIPT_URL="https://raw.githubusercontent.com/Crosstalk-Solutions/project-nomad/refs/heads/main/install/start_nomad.sh"
-STOP_SCRIPT_URL="https://raw.githubusercontent.com/Crosstalk-Solutions/project-nomad/refs/heads/main/install/stop_nomad.sh"
-UPDATE_SCRIPT_URL="https://raw.githubusercontent.com/Crosstalk-Solutions/project-nomad/refs/heads/main/install/update_nomad.sh"
+NOMAD_REPOSITORY="${NOMAD_REPOSITORY:-Crosstalk-Solutions/project-nomad}"
+NOMAD_REF="${NOMAD_REF:-main}"
+nomad_repository_owner="${NOMAD_REPOSITORY%%/*}"
+NOMAD_IMAGE="${NOMAD_IMAGE:-ghcr.io/${nomad_repository_owner,,}/project-nomad:latest}"
+NOMAD_RAW_BASE="https://raw.githubusercontent.com/${NOMAD_REPOSITORY}/${NOMAD_REF}"
+MANAGEMENT_COMPOSE_FILE_URL="${NOMAD_RAW_BASE}/install/management_compose.yaml"
+PI4_COMPOSE_FILE_URL="${NOMAD_RAW_BASE}/install/management_compose.pi4.yaml"
+START_SCRIPT_URL="${NOMAD_RAW_BASE}/install/start_nomad.sh"
+STOP_SCRIPT_URL="${NOMAD_RAW_BASE}/install/stop_nomad.sh"
+UPDATE_SCRIPT_URL="${NOMAD_RAW_BASE}/install/update_nomad.sh"
 script_option_debug='true'
 accepted_terms='false'
 local_ip_address=''
+nomad_arch=''
 
 ###################################################################################################################################################################################################
 #                                                                                                                                                                                                 #
@@ -102,19 +109,33 @@ check_is_debian_based() {
     echo -e "${GREEN}#${RESET} This script is running on a Debian-based system.\\n"
 }
 
-check_is_x86_64() {
+check_architecture() {
   local arch
   arch="$(uname -m)"
-  if [[ "${arch}" != "x86_64" && "${arch}" != "amd64" ]]; then
-    echo -e "${YELLOW}#${RESET} WARNING: Detected architecture '${arch}'. NOMAD officially supports x86_64 only.\\n"
-    echo -e "${YELLOW}#${RESET} ARM64/aarch64 support is tracked in PR #419 and is not yet ready.\\n"
-    echo -e "${YELLOW}#${RESET} Continuing on an unsupported architecture will likely fail and may leave\\n"
-    echo -e "${YELLOW}#${RESET} partial Docker images and files behind that you'll need to clean up manually.\\n"
-    echo -e "${YELLOW}#${RESET} Continuing in 10 seconds... press Ctrl+C now to abort.\\n"
-    sleep 10
-    return
+  case "${arch}" in
+    x86_64|amd64)
+      nomad_arch='amd64'
+      echo -e "${GREEN}#${RESET} Architecture check passed (${arch}).\\n"
+      ;;
+    aarch64|arm64)
+      nomad_arch='arm64'
+      if [[ "${NOMAD_EXPERIMENTAL_ARM64:-}" != '1' ]]; then
+        echo -e "${RED}#${RESET} ARM64 support is experimental and must be explicitly enabled.\\n"
+        echo -e "${YELLOW}#${RESET} Re-run with NOMAD_EXPERIMENTAL_ARM64=1 after reviewing install/README-pi4.md.\\n"
+        exit 1
+      fi
+      echo -e "${YELLOW}#${RESET} Experimental ARM64 knowledge-only profile enabled (${arch}).\\n"
+      ;;
+    *)
+      echo -e "${RED}#${RESET} Unsupported architecture '${arch}'. NOMAD requires amd64 or 64-bit ARM.\\n"
+      exit 1
+      ;;
+  esac
+
+  if [[ ! "${NOMAD_IMAGE}" =~ ^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+:[A-Za-z0-9._-]+$ ]]; then
+    echo -e "${RED}#${RESET} Invalid NOMAD_IMAGE '${NOMAD_IMAGE}'. Use a fully qualified image and tag.\\n"
+    exit 1
   fi
-  echo -e "${GREEN}#${RESET} Architecture check passed (${arch}).\\n"
 }
 
 ensure_dependencies_installed() {
@@ -425,6 +446,7 @@ create_nomad_directory(){
 
 download_management_compose_file() {
   local compose_file_path="${NOMAD_DIR}/compose.yml"
+  local pi4_compose_file_path="${NOMAD_DIR}/compose.pi4.yml"
 
   echo -e "${YELLOW}#${RESET} Downloading docker-compose file for management...\\n"
   if ! curl -fsSL "$MANAGEMENT_COMPOSE_FILE_URL" -o "$compose_file_path"; then
@@ -432,6 +454,14 @@ download_management_compose_file() {
     exit 1
   fi
   echo -e "${GREEN}#${RESET} Docker compose file downloaded successfully to $compose_file_path.\\n"
+
+  if [[ "${nomad_arch}" == 'arm64' ]]; then
+    if ! curl -fsSL "$PI4_COMPOSE_FILE_URL" -o "$pi4_compose_file_path"; then
+      echo -e "${RED}#${RESET} Failed to download the Raspberry Pi 4 compose overlay."
+      exit 1
+    fi
+    echo -e "${GREEN}#${RESET} Raspberry Pi 4 knowledge-only overlay downloaded successfully.\\n"
+  fi
 
   local app_key=$(generateRandomPass)
   local db_root_password=$(generateRandomPass)
@@ -454,6 +484,7 @@ download_management_compose_file() {
   sed -i "s|DB_PASSWORD=replaceme|DB_PASSWORD=${db_user_password}|g" "$compose_file_path"
   sed -i "s|MYSQL_ROOT_PASSWORD=replaceme|MYSQL_ROOT_PASSWORD=${db_root_password}|g" "$compose_file_path"
   sed -i "s|MYSQL_PASSWORD=replaceme|MYSQL_PASSWORD=${db_user_password}|g" "$compose_file_path"
+  sed -i "s|image: ghcr.io/crosstalk-solutions/project-nomad:latest|image: ${NOMAD_IMAGE}|g" "$compose_file_path"
   
   echo -e "${GREEN}#${RESET} Docker compose file configured successfully.\\n"
 }
@@ -486,8 +517,13 @@ download_helper_scripts() {
 }
 
 start_management_containers() {
+  local compose_args=(-f "${NOMAD_DIR}/compose.yml")
+  if [[ "${nomad_arch}" == 'arm64' ]]; then
+    compose_args+=(-f "${NOMAD_DIR}/compose.pi4.yml")
+  fi
+
   echo -e "${YELLOW}#${RESET} Starting management containers using docker compose...\\n"
-  if ! sudo docker compose -p project-nomad -f "${NOMAD_DIR}/compose.yml" up -d; then
+  if ! sudo docker compose -p project-nomad "${compose_args[@]}" up -d; then
     echo -e "${RED}#${RESET} Failed to start management containers. Please check the logs and try again."
     exit 1
   fi
@@ -632,7 +668,7 @@ success_message() {
 
 # Pre-flight checks
 check_is_debian_based
-check_is_x86_64
+check_architecture
 check_is_bash
 check_has_sudo
 ensure_dependencies_installed

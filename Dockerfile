@@ -1,4 +1,4 @@
-FROM node:22-slim AS base
+FROM node:24-slim AS base
 
 # Install bash & curl for entrypoint script compatibility, graphicsmagick for pdf2pic, and vips-dev & build-base for sharp 
 RUN apt-get update && apt-get install -y \
@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
       graphicsmagick \
       libvips-dev \
       build-essential \
+      pkg-config \
+      python3 \
       pciutils \
       && rm -rf /var/lib/apt/lists/*
 
@@ -22,6 +24,7 @@ FROM base AS production-deps
 WORKDIR /app
 ADD admin/package.json admin/package-lock.json ./
 RUN npm ci --omit=dev
+RUN node -e "Promise.all([import('@openzim/libzim'), import('better-sqlite3'), import('sharp')]).then(async ([, { default: Database }, { default: sharp }]) => { const db = new Database(':memory:'); db.close(); await sharp({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).metadata(); console.log('Native production dependencies loaded successfully'); })"
 
 # Build stage
 FROM base AS build

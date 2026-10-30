@@ -1,0 +1,15 @@
+# Raspberry Pi 4 knowledge-only overlay.
+#
+# Use with management_compose.yaml. Optional observability and self-update
+# sidecars stay disabled to preserve memory; the Command Center, MySQL, and
+# Redis remain enabled. Kiwix is installed later from the Command Center.
+services:
+  dozzle:
+    profiles:
+      - optional
+  updater:
+    profiles:
+      - optional
+  disk-collector:
+    profiles:
+      - optional

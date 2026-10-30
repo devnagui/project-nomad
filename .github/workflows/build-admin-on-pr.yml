@@ -4,7 +4,16 @@ on: pull_request
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build admin (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -15,9 +24,15 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+        working-directory: ./admin
+
+      - name: Load native production dependencies
+        run: |
+          node -e "Promise.all([import('@openzim/libzim'), import('better-sqlite3'), import('sharp')]).then(async ([, { default: Database }, { default: sharp }]) => { const db = new Database(':memory:'); db.close(); await sharp({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).metadata(); console.log('Native dependencies loaded successfully'); })"
         working-directory: ./admin
 
       - name: Run build
